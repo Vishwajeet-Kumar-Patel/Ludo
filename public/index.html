@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client - Ludo Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+        
+        .controls button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .connect-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .disconnect-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .ping-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .message-form {
+            margin: 20px 0;
+        }
+        
+        .message-form input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .username-input {
+            width: 150px;
+            margin-right: 10px;
+        }
+        
+        .message-input {
+            width: 300px;
+            margin-right: 10px;
+        }
+        
+        .send-btn {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .message {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+        
+        .message.system {
+            background-color: #e9ecef;
+            color: #495057;
+            font-style: italic;
+        }
+        
+        .message.chat {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+        }
+        
+        .message.error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .message.game {
+            background-color: #f3e5f5;
+            color: #4a148c;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .stats {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .game-controls {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        
+        .game-controls h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 WebSocket Client - Ludo Game</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+        
+        <div class="stats">
+            <strong>Connected Clients:</strong> <span id="clientCount">0</span>
+        </div>
+        
+        <div class="controls">
+            <button id="connectBtn" class="connect-btn">Connect</button>
+            <button id="disconnectBtn" class="disconnect-btn" disabled>Disconnect</button>
+            <button id="pingBtn" class="ping-btn" disabled>Ping Server</button>
+        </div>
+        
+        <div class="message-form">
+            <input type="text" id="username" class="username-input" placeholder="Your name" value="Player1">
+            <input type="text" id="messageInput" class="message-input" placeholder="Type your message...">
+            <button id="sendBtn" class="send-btn" disabled>Send Chat</button>
+        </div>
+        
+        <div class="game-controls">
+            <h3>🎮 Game Controls</h3>
+            <button id="rollDiceBtn" class="ping-btn" disabled>Roll Dice</button>
+            <button id="movePieceBtn" class="ping-btn" disabled>Move Piece</button>
+            <input type="number" id="pieceNumber" placeholder="Piece #" min="1" max="4" style="width: 80px; margin: 0 10px;">
+        </div>
+
+        <div class="room-controls" style="margin: 20px 0; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa;">
+            <h3>🏠 Room Controls</h3>
+            <input type="text" id="roomNameInput" placeholder="Room name" style="width: 200px; margin-right: 10px;">
+            <button id="createRoomBtn" class="send-btn" disabled>Create Room</button>
+            <button id="joinRoomBtn" class="ping-btn" disabled>Join Room</button>
+            <button id="listRoomsBtn" class="connect-btn" disabled>List Rooms</button>
+            <div id="roomStatus" style="margin-top: 10px; color: #007bff;"></div>
+            <div id="roomList" style="margin-top: 10px;"></div>
+        </div>
+        
+    <div id="turnInfo" style="margin: 10px 0; font-weight: bold; color: #d35400;"></div>
+    <div id="timerInfo" style="margin: 10px 0; font-weight: bold; font-size: 16px; padding: 8px; border-radius: 4px; background-color: #f8f9fa; border-left: 4px solid #c0392b;"></div>
+    <div class="messages" id="messages"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let currentRoom = null;
+
+    // DOM elements
+    const statusEl = document.getElementById('status');
+    const clientCountEl = document.getElementById('clientCount');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const pingBtn = document.getElementById('pingBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesEl = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const usernameInput = document.getElementById('username');
+    const rollDiceBtn = document.getElementById('rollDiceBtn');
+    const movePieceBtn = document.getElementById('movePieceBtn');
+    const pieceNumberInput = document.getElementById('pieceNumber');
+    const roomNameInput = document.getElementById('roomNameInput');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const listRoomsBtn = document.getElementById('listRoomsBtn');
+    const roomStatus = document.getElementById('roomStatus');
+    const roomList = document.getElementById('roomList');
+    const turnInfo = document.getElementById('turnInfo');
+    const timerInfo = document.getElementById('timerInfo');
+
+    let turnTimer = null;
+    let turnTimeLeft = 0;
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        pingBtn.addEventListener('click', sendPing);
+        sendBtn.addEventListener('click', sendMessage);
+        rollDiceBtn.addEventListener('click', rollDice);
+        movePieceBtn.addEventListener('click', movePiece);
+        createRoomBtn.addEventListener('click', createRoom);
+        joinRoomBtn.addEventListener('click', joinRoom);
+        listRoomsBtn.addEventListener('click', listRooms);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        roomNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                createRoom();
+            }
+        });
+        
+        function connect() {
+            if (isConnected) return;
+            updateStatus('connecting', 'Connecting...');
+            ws = new WebSocket('ws://localhost:3000');
+            ws.onopen = function(event) {
+                isConnected = true;
+                updateStatus('connected', 'Connected');
+                updateButtons();
+                addMessage('system', 'Connected to server');
+                roomStatus.textContent = '';
+                roomList.innerHTML = '';
+                currentRoom = null;
+            };
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                    addMessage('error', 'Received invalid message format');
+                }
+            };
+            ws.onclose = function(event) {
+                isConnected = false;
+                updateStatus('disconnected', 'Disconnected');
+                updateButtons();
+                addMessage('system', `Connection closed (${event.code}: ${event.reason || 'No reason'})`);
+                roomStatus.textContent = '';
+                roomList.innerHTML = '';
+                currentRoom = null;
+                ws = null;
+            };
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                addMessage('error', 'Connection error occurred');
+            };
+        }
+        
+        function disconnect() {
+            if (!isConnected || !ws) return;
+            ws.close();
+            ws = null;
+        }
+        
+        function sendMessage() {
+            if (!isConnected || !ws) return;
+            
+            const message = messageInput.value.trim();
+            const username = usernameInput.value.trim() || 'Anonymous';
+            
+            if (!message) return;
+            
+            const data = {
+                type: 'chat',
+                message: message,
+                sender: username
+            };
+            
+            ws.send(JSON.stringify(data));
+            messageInput.value = '';
+            
+            // Show sent message locally
+            addMessage('chat', `${username}: ${message}`, true);
+        }
+        
+        function sendPing() {
+            if (!isConnected || !ws) return;
+            
+            ws.send(JSON.stringify({
+                type: 'ping'
+            }));
+            
+            addMessage('system', 'Ping sent');
+        }
+        
+        function rollDice() {
+            if (!isConnected || !ws) return;
+            
+            const diceValue = Math.floor(Math.random() * 6) + 1;
+            const username = usernameInput.value.trim() || 'Anonymous';
+            
+            const data = {
+                type: 'game_move',
+                move: 'dice_roll',
+                player: username,
+                value: diceValue
+            };
+            
+            ws.send(JSON.stringify(data));
+            addMessage('game', `🎲 You rolled: ${diceValue}`, true);
+        }
+        
+        function movePiece() {
+            if (!isConnected || !ws) return;
+            
+            const pieceNumber = pieceNumberInput.value;
+            const username = usernameInput.value.trim() || 'Anonymous';
+            
+            if (!pieceNumber || pieceNumber < 1 || pieceNumber > 4) {
+                addMessage('error', 'Please enter a valid piece number (1-4)');
+                return;
+            }
+            
+            const data = {
+                type: 'game_move',
+                move: 'piece_move',
+                player: username,
+                piece: parseInt(pieceNumber)
+            };
+            
+            ws.send(JSON.stringify(data));
+            addMessage('game', `♟️ You moved piece ${pieceNumber}`, true);
+        }
+        
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'welcome':
+                    addMessage('system', data.message);
+                    clientCountEl.textContent = data.clientCount;
+                    break;
+                case 'room_created':
+                    roomStatus.textContent = `Room created: ${data.roomName}`;
+                    currentRoom = data.roomName;
+                    break;
+                case 'room_joined':
+                    roomStatus.textContent = `Joined room: ${data.roomName}`;
+                    currentRoom = data.roomName;
+                    break;
+                case 'room_list':
+                    renderRoomList(data.rooms);
+                    break;
+                case 'turn':
+                    console.log('[DEBUG] Received turn message:', data);
+                    showTurnInfo(data);
+                    break;
+                case 'turn_timeout':
+                    console.log('[DEBUG] Received turn_timeout message:', data);
+                    showTurnTimeout(data);
+                    break;
+                case 'chat':
+                    addMessage('chat', `${data.sender}: ${data.message}`);
+                    break;
+                case 'user_joined':
+                case 'user_left':
+                    addMessage('system', data.message);
+                    clientCountEl.textContent = data.clientCount;
+                    break;
+                case 'game_move':
+                    if (data.move === 'dice_roll') {
+                        addMessage('game', `🎲 ${data.player} rolled: ${data.value}`);
+                    } else if (data.move === 'piece_move') {
+                        addMessage('game', `♟️ ${data.player} moved piece ${data.piece}`);
+                    } else {
+                        addMessage('game', `🎮 ${data.player} made a move: ${JSON.stringify(data.move)}`);
+                    }
+                    break;
+                case 'pong':
+                    addMessage('system', 'Pong received');
+                    break;
+                case 'error':
+                    addMessage('error', `Server error: ${data.message}`);
+                    break;
+                default:
+                    addMessage('system', `Unknown message: ${JSON.stringify(data)}`);
+            }
+        }
+
+        function showTurnInfo(data) {
+            console.log('[DEBUG] showTurnInfo called with:', data);
+            console.log('[DEBUG] turnInfo element:', turnInfo);
+            console.log('[DEBUG] timerInfo element:', timerInfo);
+            
+            let username = usernameInput.value.trim() || 'Anonymous';
+            let isMyTurn = (data.playerName === username);
+            
+            // Clear existing timer
+            clearInterval(turnTimer);
+            
+            // Show player names
+            let playersList = data.playerNames ? data.playerNames.map((name, idx) => {
+                if (name === username) {
+                    return `<b style='color:#27ae60'>${name} (You)</b>`;
+                } else if (idx === data.playerIndex) {
+                    return `<b style='color:#d35400'>${name} (Current)</b>`;
+                } else {
+                    return name;
+                }
+            }).join(', ') : '';
+            
+            const turnText = `Turn: <span style='color:#d35400'>${data.playerName}</span> ${isMyTurn ? "<b style='color:#27ae60'>(Your turn!)</b>" : ''}<br><small>Players: ${playersList}</small>`;
+            console.log('[DEBUG] Setting turnInfo.innerHTML to:', turnText);
+            turnInfo.innerHTML = turnText;
+            
+            if (isMyTurn) {
+                // Show timer only for current user's turn
+                turnTimeLeft = 10;
+                updateTimerInfo(true);
+                turnTimer = setInterval(() => {
+                    turnTimeLeft--;
+                    updateTimerInfo(true);
+                    if (turnTimeLeft <= 0) {
+                        clearInterval(turnTimer);
+                    }
+                }, 1000);
+            } else {
+                // Show current player's name instead of timer
+                updateTimerInfo(false, data.playerName);
+            }
+        }
+
+        function showTurnTimeout(data) {
+            addMessage('system', `⏰ ${data.playerName}'s turn timed out!`);
+            // Don't clear turn info immediately, let the next turn message handle it
+            clearInterval(turnTimer);
+        }
+
+        function updateTimerInfo(showTimer = true, currentPlayerName = '') {
+            if (showTimer) {
+                const timerText = `⏳ Your turn - Time left: ${turnTimeLeft}s`;
+                console.log('[DEBUG] Setting timerInfo.textContent to:', timerText);
+                timerInfo.textContent = timerText;
+                timerInfo.style.color = '#c0392b'; // Red for your timer
+                timerInfo.style.borderLeftColor = '#c0392b'; // Red border for your turn
+            } else {
+                const playerText = `🎮 ${currentPlayerName}'s turn`;
+                console.log('[DEBUG] Setting timerInfo.textContent to:', playerText);
+                timerInfo.textContent = playerText;
+                timerInfo.style.color = '#2980b9'; // Blue for other player's turn
+                timerInfo.style.borderLeftColor = '#2980b9'; // Blue border for other player's turn
+            }
+        }
+
+        function createRoom() {
+            if (!isConnected || !ws) return;
+            const roomName = roomNameInput.value.trim();
+            if (!roomName) {
+                roomStatus.textContent = 'Please enter a room name.';
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'create_room', roomName }));
+        }
+
+        function joinRoom() {
+            if (!isConnected || !ws) return;
+            const roomName = roomNameInput.value.trim();
+            const username = usernameInput.value.trim() || 'Anonymous';
+            if (!roomName) {
+                roomStatus.textContent = 'Please enter a room name.';
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'join_room', roomName, username }));
+        }
+
+        function listRooms() {
+            if (!isConnected || !ws) return;
+            ws.send(JSON.stringify({ type: 'list_rooms' }));
+        }
+
+        function renderRoomList(rooms) {
+            if (!rooms || rooms.length === 0) {
+                roomList.innerHTML = '<em>No rooms available.</em>';
+                return;
+            }
+            roomList.innerHTML = '<strong>Available Rooms:</strong><ul style="margin: 5px 0 0 15px;">' +
+                rooms.map(room => `<li>${room} <button onclick=\"joinRoomFromList('${room}')\">Join</button></li>`).join('') + '</ul>';
+        }
+
+        // Allow joining from room list
+        window.joinRoomFromList = function(roomName) {
+            roomNameInput.value = roomName;
+            joinRoom();
+        }
+        
+        function addMessage(type, message, isLocal = false) {
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = isLocal ? '[You] ' : '';
+            
+            messageEl.innerHTML = `
+                <div>${prefix}${message}</div>
+                <div class="timestamp">${timestamp}</div>
+            `;
+            
+            messagesEl.appendChild(messageEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        
+        function updateStatus(status, text) {
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = text;
+        }
+        
+        function updateButtons() {
+            connectBtn.disabled = isConnected;
+            disconnectBtn.disabled = !isConnected;
+            pingBtn.disabled = !isConnected;
+            sendBtn.disabled = !isConnected;
+            rollDiceBtn.disabled = !isConnected;
+            movePieceBtn.disabled = !isConnected;
+            createRoomBtn.disabled = !isConnected;
+            joinRoomBtn.disabled = !isConnected;
+            listRoomsBtn.disabled = !isConnected;
+        }
+        
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            connect();
+        });
+    </script>
+</body>
+</html>
