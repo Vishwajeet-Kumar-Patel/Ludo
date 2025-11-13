@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+/*const WebSocket = require('ws');
 const express = require('express');
 const path = require('path');
 const http = require('http');
@@ -326,4 +326,34 @@ process.on('SIGINT', () => {
         console.log('Server closed');
         process.exit(0);
     });
+});*/
+
+
+
+
+const { Server } = require("socket.io");
+
+const io = new Server(3000, {
+    cors: { origin: "*" }
+});
+
+io.on("connection", socket => {
+    console.log("Client connected", socket.id);
+
+    socket.emit("joined", { id: socket.id });
+
+    socket.on("rollDice", () => {
+        const dice = Math.floor(Math.random() * 6) + 1;
+        io.emit("diceRolled", JSON.stringify({ playerId: socket.id, diceValue: dice }));
+        console.log("Dice rolled by", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Client disconnected", socket.id);
+    });
+});
+
+io.on("disconnect", socket => {
+    console.log("Client disconnected", socket.id);
+
 });
