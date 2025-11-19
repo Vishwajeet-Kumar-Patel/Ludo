@@ -333,27 +333,59 @@ process.on('SIGINT', () => {
 
 const { Server } = require("socket.io");
 
+const rooms = {};
+
+
 const io = new Server(3000, {
     cors: { origin: "*" }
 });
 
 io.on("connection", socket => {
-    console.log("Client connected", socket.id);
+    console.log("New client connected", socket.id);
 
-    socket.emit("joined", { id: socket.id });
+    socket.on("joinGame", (data) => {
+        console.log("Client joined game", socket.id, data);
 
-    socket.on("rollDice", () => {
-        const dice = Math.floor(Math.random() * 6) + 1;
-        io.emit("diceRolled", JSON.stringify({ playerId: socket.id, diceValue: dice }));
-        console.log("Dice rolled by", socket.id);
-    });
+        const playerData = JSON.parse(data);
+        
+        //const roomId = data.roomId;
+        let chosenRoom = null;
 
-    socket.on("disconnect", () => {
-        console.log("Client disconnected", socket.id);
-    });
+        // ⿡ Check if any room has space
+        for (const roomId in rooms) {
+            if (rooms[roomId].players.length < playerData.maxPlayers) {
+                chosenRoom = roomId;
+                
+                console.log("⿢ Found room with space:", roomId);
+                break;           
+            }
+        }
+
+        // ⿢ If no room found → create new room
+        if (!chosenRoom) {
+            chosenRoom = generateRoomId();
+            rooms[chosenRoom] = {
+                players: [],
+                createdAt: Date.now()
+            };
+            console.log("⿢ Created new room:", chosenRoom);    
+        }
+console.log("Client", playerData.playerId);
+if (rooms[chosenRoom].players.includes(playerData.playerID)) {
+    
+rooms[chosenRoom].players.push(playerData.playerId);
+        console.log("Rooms state:", rooms);
+} else {
+    rooms[chosenRoom].players.push(playerData.playerId);
+}
+    }); 
 });
 
 io.on("disconnect", socket => {
     console.log("Client disconnected", socket.id);
 
 });
+
+function generateRoomId() {
+    return "room-" + Math.random().toString(36).substr(2, 5);
+}
