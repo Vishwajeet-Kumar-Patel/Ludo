@@ -16,4 +16,3 @@ coverage/
 *.pid.lock
 .npm
 .eslintcache
-.env.example
