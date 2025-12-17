@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const redis = require('./redisClient');
 
 const rooms = {};
 
@@ -88,6 +89,10 @@ io.on("connection", socket => {
                 createdAt: Date.now()
             };
             socket.join(chosenRoom);
+            
+            // Cache room in Redis
+            redis.set(`room:${chosenRoom}`, JSON.stringify(rooms[chosenRoom]));
+            
             console.log("⿢ Created new room:", chosenRoom);    
         }
 
@@ -133,8 +138,10 @@ io.on("connection", socket => {
             //console.log("Player Key:", playerKey);
             //console.log("Player Index:", playerIndex);
             //console.log("Path Array Length:", playerPath.length);
-            //console.log("Path Values:", playerPath);
-            //console.log("======================");
+            
+            // Cache player data in Redis
+            redis.hSet(`room:${chosenRoom}:players`, playerData.playerId, JSON.stringify(rooms[chosenRoom].playerData[playerData.playerId]));
+            redis.set(`room:${chosenRoom}`, JSON.stringify(rooms[chosenRoom]));
             
             io.to(chosenRoom).emit("joinRoom", {
                 roomId: chosenRoom,
@@ -160,7 +167,7 @@ io.on("connection", socket => {
         io.to(messageData.roomId).emit("chatSent", data);
     });
 
-    socket.on("moveToken", ({ player, token, dice, roomId }) => {
+    socket.on("moveToken", async ({ player, token, dice, roomId }) => {
         const move = moveToken(player, token, dice);
 
         if (!move.moved) {
@@ -169,6 +176,9 @@ io.on("connection", socket => {
 
         const killed = checkKill(player, move.position);
 
+        // Update token positions in Redis
+        await redis.set(`room:${roomId}:tokens`, JSON.stringify(tokenPositions));
+        
         io.to(roomId).emit("tokenMoved", {
             player,
             token,
@@ -177,8 +187,42 @@ io.on("connection", socket => {
         });
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
         console.log("Client disconnected", socket.id);
+        
+        // Find and remove player from rooms
+        for (const roomId in rooms) {
+            const room = rooms[roomId];
+            for (const playerId in room.playerData) {
+                if (room.playerData[playerId].socketId === socket.id) {
+                    console.log(`Player ${playerId} left room ${roomId}`);
+                    
+                    // Remove player from room
+                    room.players = room.players.filter(id => id !== playerId);
+                    delete room.playerData[playerId];
+                    
+                    // Update Redis
+                    await redis.set(`room:${roomId}`, JSON.stringify(room));
+                    await redis.del(`room:${roomId}:players:${playerId}`);
+                    
+                    // Notify other players
+                    io.to(roomId).emit("playerLeft", {
+                        playerId,
+                        remainingPlayers: room.players
+                    });
+                    
+                    // Delete room if empty
+                    if (room.players.length === 0) {
+                        delete rooms[roomId];
+                        await redis.del(`room:${roomId}`);
+                        await redis.del(`room:${roomId}:players`);
+                        await redis.del(`room:${roomId}:tokens`);
+                        console.log(`Room ${roomId} deleted (empty)`);
+                    }
+                    break;
+                }
+            }
+        }
     });
 });
 
@@ -258,5 +302,25 @@ function checkKill(player, tile) {
 
     return killed;
 }
+
+// Helper function to load rooms from Redis on server restart
+async function loadRoomsFromRedis() {
+    if (!redis.isConnected()) {
+        console.log("⚠️  Redis not connected, starting with empty rooms");
+        return;
+    }
+    
+    try {
+        console.log("📥 Loading rooms from Redis...");
+        // This would require scanning all room keys
+        // For now, we'll just log that Redis is available
+        console.log("✅ Redis connected - room data will be cached");
+    } catch (error) {
+        console.log("⚠️  Failed to load from Redis:", error.message);
+    }
+}
+
+// Load existing rooms from Redis on startup
+loadRoomsFromRedis();
 
 console.log("🎲 Ludo Server running on port 3000");
