@@ -27,6 +27,12 @@ class GameSocketHandler {
         socket.on('reconnect_player', (data) => this.handleReconnection(socket, data));
         socket.on('heartbeat', () => this.handleHeartbeat(socket));
         
+        // Load testing support - ping/pong for latency measurement
+        socket.on('ping', (data) => {
+            socket.emit('pong', { ...data, serverTime: Date.now() });
+        });
+        socket.emit('eventResponse', { status: 'connected', timestamp: Date.now() });
+        
         // Disconnect
         socket.on('disconnect', () => this.handleDisconnect(socket));
     }
@@ -680,6 +686,7 @@ class GameSocketHandler {
         const userId = this.socketPlayers.get(socket.id);
         if (userId) {
             socket.emit('heartbeat_ack');
+            socket.emit('eventResponse', { type: 'heartbeat', timestamp: Date.now() });
         }
     }
 

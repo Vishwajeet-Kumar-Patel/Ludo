@@ -7,7 +7,11 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
-    "lint": "eslint src/**/*.js"
+    "lint": "eslint src/**/*.js",
+    "test:metrics": "node tests/load-test.js",
+    "test:quick": "node tests/quick-metrics.js",
+    "test:concurrency": "node -e \"require('./tests/load-test').testConcurrency()\"",
+    "test:all": "npm run test:metrics"
   },
   "keywords": [
     "websocket",
@@ -40,6 +44,7 @@
   "devDependencies": {
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "socket.io-client": "^4.8.1"
   }
 }
