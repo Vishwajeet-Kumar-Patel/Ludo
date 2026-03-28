@@ -8,6 +8,13 @@ This backend powers a real-time Ludo multiplayer game where players can join gam
 
 **Tech Stack:** Node.js • Socket.IO • Redis • PostgreSQL • WebRTC • JWT • Docker
 
+##🚀 Key Engineering Highlights
+
+- Real-time multiplayer backend using WebSockets and Redis
+- Distributed locking using Redis (SET NX + TTL) to prevent race conditions
+- Stateless architecture enabling horizontal scaling
+- Reconnection handling with state recovery for disconnected players
+
 ## Key Technical Achievements
 
 ### 1. Low-Latency Distributed Backend
@@ -353,7 +360,7 @@ docker run -p 3000:3000 --env-file .env ludo-backend
 
 **Current Metrics:**
 - Response time: < 50ms (p95)
-- Concurrent connections: 10,000+ per instance
+- Handle high concurrent connections with optimized in-memory state management
 - Memory: ~400MB baseline + ~5KB per connection
 
 **Scaling Approach:**
